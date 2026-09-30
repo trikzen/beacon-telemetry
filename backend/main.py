@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -11,7 +12,8 @@ from models import Event
 from ws_manager import ConnectionManager
 
 BASE_DIR = Path(__file__).resolve().parent
-STATIC_DIR = BASE_DIR / "static"
+# The dashboard sits next to this folder. Set BEACON_DASHBOARD_DIR to use another location.
+DASHBOARD_DIR = Path(os.environ.get("BEACON_DASHBOARD_DIR", BASE_DIR.parent / "dashboard"))
 manager = ConnectionManager()
 
 
@@ -44,7 +46,7 @@ async def handle_event(event: Event) -> dict:
 @app.get("/", include_in_schema=False)
 def dashboard():
     """The dashboard page: http://localhost:8000"""
-    return FileResponse(STATIC_DIR / "index.html")
+    return FileResponse(DASHBOARD_DIR / "index.html")
 
 
 @app.get("/health")
@@ -77,5 +79,5 @@ async def live_feed(websocket: WebSocket):
         manager.disconnect(websocket)
 
 
-# Static files: the dashboard's CSS and JavaScript (and the older test page)
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+# The dashboard's CSS and JavaScript, served at /static
+app.mount("/static", StaticFiles(directory=DASHBOARD_DIR), name="static")
