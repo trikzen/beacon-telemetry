@@ -18,12 +18,17 @@ Examples:
     python fake_device.py --type all --devices 3 --count 0 --interval 1
     python fake_device.py --rand                         # random types, devices, rounds, interval
     python fake_device.py --rand --devices 3             # random, but always 3 devices
+
+If the server requires API keys (BEACON_REQUIRE_KEY=1), each key belongs to one device id:
+    python fake_device.py --device-id alice_esp --key bk_...
+    (or set the key once:  $env:BEACON_API_KEY = "bk_..."  in PowerShell)
     python fake_device.py --count 0 --interval 0.5       # run until Ctrl+C
     python fake_device.py --invalid-rate 0.2             # 20% deliberately broken events
 """
 
 import argparse
 import json
+import os
 import random
 import sys
 import time
@@ -110,12 +115,25 @@ def break_event(event: dict) -> dict:
     return broken
 
 
-def post_event(url: str, payload: dict) -> tuple[int, str]:
+# What a rejection from a server that requires API keys usually means
+HINTS = {
+    401: "the server wants an API key. Pass --key bk_... (or set BEACON_API_KEY). "
+         "Make one with: python manage_keys.py create <device_id>",
+    403: "that key belongs to a different device id. Use --device-id <the id the key was made for> "
+         "(with --devices 1).",
+    429: "sending too fast for this key's rate limit. Raise --interval.",
+}
+
+
+def post_event(url: str, payload: dict, key: str | None = None) -> tuple[int, str]:
     """POST one event. Returns (HTTP status, response body)."""
+    headers = {"Content-Type": "application/json"}
+    if key:
+        headers["X-API-Key"] = key
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers=headers,
         method="POST",
     )
     try:
@@ -128,6 +146,12 @@ def post_event(url: str, payload: dict) -> tuple[int, str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Send fake telemetry events.")
     parser.add_argument("--url", default="http://localhost:8000/events")
+    parser.add_argument("--key", default=None,
+                        help="API key to send in the X-API-Key header "
+                             "(default: the BEACON_API_KEY environment variable, if set)")
+    parser.add_argument("--device-id", default=None,
+                        help="use this exact device id (needs --devices 1). A key only "
+                             "works for the device id it was made for")
     parser.add_argument("--rand", action="store_true",
                         help="pick random settings for anything you don't give "
                              "(types, devices, count, interval)")
@@ -168,6 +192,9 @@ def main() -> int:
         args.interval = 1.0 if args.interval is None else args.interval
     if args.devices < 1:
         raise SystemExit("--devices must be at least 1")
+    if args.device_id is not None and args.devices != 1:
+        raise SystemExit("--device-id names one device, so it needs --devices 1")
+    api_key = args.key or os.environ.get("BEACON_API_KEY") or None
     if args.count < 0:
         raise SystemExit("--count cannot be negative (use 0 to run until Ctrl+C)")
     if args.interval < 0:
@@ -184,12 +211,13 @@ def main() -> int:
     for n in range(args.devices):
         sensor = types[n % len(types)]
         made[sensor] += 1
-        device_id = f"{SENSOR_TYPES[sensor][1]}_{made[sensor]:02d}"
+        device_id = args.device_id or f"{SENSOR_TYPES[sensor][1]}_{made[sensor]:02d}"
         device_ids.append(device_id)
         sensor_of[device_id] = sensor
     sequences = {device_id: 1 for device_id in device_ids}
     states = {device_id: {} for device_id in device_ids}   # each device's last readings
     accepted = rejected = 0
+    hinted = set()          # each hint is printed once, not on every rejected event
     round_number = 0
 
     print(f"Sending to {args.url} from {len(device_ids)} device(s). Ctrl+C to stop.")
@@ -205,7 +233,7 @@ def main() -> int:
                     event = break_event(event)
 
                 try:
-                    status, body = post_event(args.url, event)
+                    status, body = post_event(args.url, event, api_key)
                 except (urllib.error.URLError, OSError) as err:
                     print(f"Could not reach {args.url}: {err}")
                     print("Is the server running? Start it with: "
@@ -222,6 +250,9 @@ def main() -> int:
                 else:
                     rejected += 1
                     print(f"[{device_id}] -> rejected with HTTP {status}{label}")
+                    if not deliberately_bad and status in HINTS and status not in hinted:
+                        hinted.add(status)
+                        print(f"    Hint: {HINTS[status]}")
 
             round_number += 1
             if args.count == 0 or round_number < args.count:
