@@ -22,6 +22,7 @@
     <h1>beacon-telemetry</h1>
     <div class="topbar-right">
       <span id="status" class="badge">Disconnected</span>
+      <button id="clearBtn" class="btn" type="button" title="Clear the feed and charts on this page. Stored data is not deleted.">Clear</button>
       <button id="themeToggle" class="btn" type="button" aria-pressed="false">Dark mode</button>
     </div>
   </header>
@@ -55,7 +56,7 @@
           <tbody id="rows"></tbody>
         </table>
       </div>
-      <p id="emptyFeed" class="muted">Waiting for events. Run <code>python fake_device.py</code> in another window.</p>
+      <p id="emptyFeed" class="muted">Waiting for events. Run <code>python examples/fake_device.py</code> in another window.</p>
     </section>
   </main>
 

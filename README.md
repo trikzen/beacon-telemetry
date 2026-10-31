@@ -15,8 +15,8 @@ Real-time IoT telemetry platform: a FastAPI + SQLite backend, a WebSocket live f
 - **Validation.** Every event is checked with Pydantic. Bad events get a `422` response and are never stored.
 - **Persistence.** Events are saved to SQLite and survive restarts.
 - **Live updates.** Each saved event is pushed to every open dashboard over a WebSocket.
-- **Dashboard.** Connection badge, device list with last-seen times, per-device filter, live event feed, history loaded when the page opens, and light/dark mode.
-- **Automatic charts.** Charts are chosen from the data, not hard-coded per device: a numeric field becomes a line chart (one line per device), and a text field with a few distinct values becomes a bar chart of counts.
+- **Dashboard.** Connection badge, device list with last-seen times, per-device filter, live event feed, history loaded when the page opens, a Clear button, and light/dark mode.
+- **Automatic charts.** Charts are chosen from the data, not hard-coded per device: a numeric field becomes a line chart (one line per device), and a text field with a few distinct values becomes a bar chart of counts. A chart shows the current run only: after a long pause in the data, new readings start a fresh chart instead of being joined to old ones.
 - **Test without hardware.** A simulator script sends realistic fake events.
 - **Docker support.** One command starts everything.
 
@@ -27,7 +27,7 @@ Real-time IoT telemetry platform: a FastAPI + SQLite backend, a WebSocket live f
 Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine with Compose).
 
 ```bash
-git clone https://github.com/trikzen/beacon-telemetry.git
+git clone https://github.com/YOUR-USERNAME/beacon-telemetry.git
 cd beacon-telemetry
 docker compose up --build
 ```
@@ -217,6 +217,7 @@ Current limitations:
 
 Planned, not built yet:
 
+- An example device: ESP32 with an IMU, running a small neural network on the device (TinyML)
 - MQTT ingestion alongside HTTP
 - Per-device authentication and a device registry
 - Reliable delivery from devices (buffering while offline, sequence-based de-duplication)
