@@ -18,6 +18,7 @@ Real-time IoT telemetry platform: a FastAPI + SQLite backend, a WebSocket live f
 - **Dashboard.** Connection badge, device list with last-seen times, per-device filter, live event feed, history loaded when the page opens, a Clear button, and light/dark mode.
 - **Automatic charts.** Charts are chosen from the data, not hard-coded per device: a numeric field becomes a line chart (one line per device), and a text field with a few distinct values becomes a bar chart of counts. A chart shows the current run only: after a long pause in the data, new readings start a fresh chart instead of being joined to old ones.
 - **Test without hardware.** A simulator script sends realistic fake events.
+- **Demo mode.** One setting makes the server generate its own simulated devices, so a public link always shows live charts.
 - **Docker support.** One command starts everything.
 
 ## Quick start
@@ -27,7 +28,7 @@ Real-time IoT telemetry platform: a FastAPI + SQLite backend, a WebSocket live f
 Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine with Compose).
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/beacon-telemetry.git
+git clone https://github.com/trikzen/beacon-telemetry.git
 cd beacon-telemetry
 docker compose up --build
 ```
@@ -60,6 +61,26 @@ python -m uvicorn main:app --reload
 
 Open <http://localhost:8000>. The database file `telemetry.db` is created in the folder you started the server from.
 
+### Demo mode (no simulator needed)
+
+Set `BEACON_DEMO=1` and the server makes up six devices of its own (motion, climate and water quality, named `demo_*`). Charts move as soon as the page opens, and a banner on the dashboard says the data is simulated.
+
+Docker (PowerShell):
+
+```powershell
+$env:BEACON_DEMO=1; docker compose up --build
+```
+
+Python (PowerShell, from `backend/`):
+
+```powershell
+$env:BEACON_DEMO=1; python -m uvicorn main:app --reload
+```
+
+macOS / Linux: `BEACON_DEMO=1 docker compose up --build`, or `BEACON_DEMO=1 python -m uvicorn main:app --reload`.
+
+It is off by default. Demo events go through the same validation, storage and live feed as real ones, and the server keeps only the newest few thousand demo events, so the database never grows without limit (events from other devices are never deleted). In PowerShell the variable stays set for that window; remove it with `Remove-Item Env:BEACON_DEMO`.
+
 ### Send some data (no hardware needed)
 
 In a second terminal, from the repository root:
@@ -68,10 +89,32 @@ In a second terminal, from the repository root:
 python examples/fake_device.py --devices 3 --count 30 --interval 0.5
 ```
 
+Sensor types it can simulate:
+
+| Type | Device names | Event type | Readings |
+| :--- | :--- | :--- | :--- |
+| `motion` | `esp32_sim_01`, ... | `motion` | `state` (Idle, Continuous_Vibration, Tilted_Abnormal), `confidence` |
+| `climate` | `climate_01`, ... | `climate` | `temperature` (C), `humidity` (%) |
+| `water` | `water_01`, ... | `water_quality` | `ph`, `temperature` (C), `status` (OK, Too_Acidic, Too_Alkaline) |
+
+Readings drift gradually like a real sensor. For a quick random demo with no options to remember:
+
+```bash
+python examples/fake_device.py --rand
+```
+
+Or a mixed run with live updates until you press Ctrl+C:
+
+```bash
+python examples/fake_device.py --type all --devices 6 --count 0 --interval 1
+```
+
 | Option | Default | Meaning |
 | :--- | :--- | :--- |
 | `--url` | `http://localhost:8000/events` | Where to send events |
+| `--rand` | off | Pick random settings for anything you don't give (types, devices, count, interval). Prints what it chose and a `--seed` to repeat the run |
 | `--devices` | `1` | Number of simulated devices |
+| `--type` | `motion` | Sensor type: `motion`, `climate`, `water`, `all`, or a comma list such as `climate,water`. With several types, devices take turns |
 | `--count` | `10` | Rounds to send (`0` = run until Ctrl+C) |
 | `--interval` | `1.0` | Seconds between rounds |
 | `--invalid-rate` | `0` | Fraction of events deliberately broken (`0` to `1`), to see validation at work |
@@ -144,7 +187,7 @@ A missing or invalid field returns `422` with a message naming the field. The ev
 | `POST` | `/events` | Submit an event |
 | `GET` | `/events` | Recent events, newest first. Query: `limit` (1 to 500, default 50), `device_id` |
 | `WS` | `/ws` | Live feed of new events |
-| `GET` | `/health` | Health check |
+| `GET` | `/health` | Health check. Also says whether demo mode is on (`"demo": true`) |
 | `GET` | `/docs` | Interactive API documentation (Swagger UI) |
 
 ### WebSocket messages
@@ -189,6 +232,7 @@ beacon-telemetry/
 │   ├── models.py          The Event schema (the data contract)
 │   ├── db.py              All SQLite code
 │   ├── ws_manager.py      Tracks WebSocket clients and broadcasts to them
+│   ├── demo.py            Demo mode: the server's own simulated devices
 │   └── requirements.txt
 ├── dashboard/             index.html, style.css, app.js (plain JavaScript + Chart.js)
 ├── examples/
@@ -205,6 +249,9 @@ beacon-telemetry/
 | :--- | :--- | :--- |
 | `BEACON_DB` | `telemetry.db` (`/data/telemetry.db` in Docker) | Path of the SQLite database file |
 | `BEACON_DASHBOARD_DIR` | `../dashboard` (next to `backend/`) | Folder containing the dashboard files |
+| `BEACON_DEMO` | off | `1`, `true`, `yes` or `on` turns demo mode on |
+| `BEACON_DEMO_INTERVAL` | `1.0` | Seconds between demo ticks (0.2 to 60) |
+| `BEACON_DEMO_KEEP` | `3000` | Newest demo events kept while demo mode runs (at least 100) |
 
 ## Limitations and roadmap
 
