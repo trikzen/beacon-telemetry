@@ -50,6 +50,20 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_events_device ON events (device_id, id)"
         )
+        # API keys. Only a hash of each key is stored, never the key itself.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS device_keys (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_id   TEXT NOT NULL,
+                key_hash    TEXT NOT NULL UNIQUE,
+                key_prefix  TEXT NOT NULL,
+                created_at  TEXT NOT NULL
+                            DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                revoked_at  TEXT
+            )
+            """
+        )
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict:
@@ -137,3 +151,58 @@ def prune_events(keep: int, device_ids: list[str]) -> int:
             [*device_ids, *device_ids, keep],
         )
         return cur.rowcount
+
+
+# ---- API keys ----
+def create_key(device_id: str, key_hash: str, key_prefix: str) -> int:
+    """Store the hash of a new key for a device and return the key's id."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "INSERT INTO device_keys (device_id, key_hash, key_prefix) VALUES (?, ?, ?)",
+            (device_id, key_hash, key_prefix),
+        )
+        return cur.lastrowid
+
+
+def find_key(key_hash: str) -> dict | None:
+    """The active (not revoked) key with this hash, or None."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, device_id FROM device_keys WHERE key_hash = ? AND revoked_at IS NULL",
+            (key_hash,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def list_keys() -> list[dict]:
+    """Every key, oldest first. The hash is never returned."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, device_id, key_prefix, created_at, revoked_at FROM device_keys ORDER BY id"
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def revoke_key(key_id: int) -> dict | None:
+    """Revoke a key. Returns the key's details, or None if there is no such key.
+
+    Revoking twice is harmless: the original revoke time is kept.
+    """
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE device_keys SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') "
+            "WHERE id = ? AND revoked_at IS NULL",
+            (key_id,),
+        )
+        row = conn.execute(
+            "SELECT id, device_id, key_prefix, created_at, revoked_at FROM device_keys WHERE id = ?",
+            (key_id,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def count_active_keys() -> int:
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT COUNT(*) FROM device_keys WHERE revoked_at IS NULL"
+        ).fetchone()[0]

@@ -12,15 +12,12 @@ Settings (environment variables):
 """
 
 import asyncio
-import logging
-import os
 import random
 import time
 from typing import Awaitable, Callable
 
 from models import Event
-
-log = logging.getLogger("uvicorn.error")   # shows up next to the server's own messages
+from settings import env_flag, env_number, log
 
 DEFAULT_INTERVAL = 1.0
 DEFAULT_KEEP = 3000
@@ -29,27 +26,15 @@ PRUNE_EVERY_S = 60
 
 # ---- settings ----
 def demo_enabled() -> bool:
-    return os.environ.get("BEACON_DEMO", "").strip().lower() in {"1", "true", "yes", "on"}
-
-
-def _number(name: str, default: float, low: float, high: float) -> float:
-    raw = os.environ.get(name)
-    if raw is None or not raw.strip():
-        return default
-    try:
-        value = float(raw)
-    except ValueError:
-        log.warning("%s=%r is not a number; using %s", name, raw, default)
-        return default
-    return min(high, max(low, value))
+    return env_flag("BEACON_DEMO")
 
 
 def demo_interval() -> float:
-    return _number("BEACON_DEMO_INTERVAL", DEFAULT_INTERVAL, 0.2, 60.0)
+    return env_number("BEACON_DEMO_INTERVAL", DEFAULT_INTERVAL, 0.2, 60.0)
 
 
 def demo_keep() -> int:
-    return int(_number("BEACON_DEMO_KEEP", DEFAULT_KEEP, 100, 1_000_000))
+    return int(env_number("BEACON_DEMO_KEEP", DEFAULT_KEEP, 100, 1_000_000))
 
 
 # ---- fake readings ----
