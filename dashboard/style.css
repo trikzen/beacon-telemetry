@@ -160,3 +160,9 @@ td.data {
   word-break: break-all;
   min-width: 240px;    /* stops the column collapsing on narrow screens */
 }
+
+.chart-note {
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
