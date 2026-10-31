@@ -1,0 +1,15 @@
+.git
+.gitignore
+.vscode/
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.db
+docs/
+examples/
+README.md
+LICENSE
+Dockerfile
+docker-compose.yml
+.dockerignore
