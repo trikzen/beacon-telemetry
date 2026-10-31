@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>beacon-telemetry dashboard</title>
+  <script>
+    // Apply the saved (or system) theme before the first paint, so there is no flash.
+    (function () {
+      var theme = "light";
+      try {
+        theme = localStorage.getItem("theme") ||
+          (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      } catch (err) { /* storage blocked: fall back to light */ }
+      document.documentElement.dataset.theme = theme;
+    })();
+  </script>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>beacon-telemetry</h1>
+    <div class="topbar-right">
+      <span id="status" class="badge">Disconnected</span>
+      <button id="themeToggle" class="btn" type="button" aria-pressed="false">Dark mode</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <h2>Devices</h2>
+      <label class="field">
+        Show
+        <select id="deviceFilter">
+          <option value="all">All devices</option>
+        </select>
+      </label>
+      <ul id="deviceList" class="device-list"></ul>
+      <p id="noDevices" class="muted">No devices yet.</p>
+    </aside>
+
+    <section class="content">
+      <h2>Charts</h2>
+      <p id="chartsNotice" class="notice" hidden></p>
+      <p id="chartsEmpty" class="muted">Charts appear once events arrive.</p>
+      <div id="charts" class="charts"></div>
+
+      <h2>Live feed</h2>
+      <p id="feedMeta" class="muted"></p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Time</th><th>Device</th><th>Seq</th><th>Type</th><th>Data</th></tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <p id="emptyFeed" class="muted">Waiting for events. Run <code>python fake_device.py</code> in another window.</p>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
