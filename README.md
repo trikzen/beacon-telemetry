@@ -68,10 +68,32 @@ In a second terminal, from the repository root:
 python examples/fake_device.py --devices 3 --count 30 --interval 0.5
 ```
 
+Sensor types it can simulate:
+
+| Type | Device names | Event type | Readings |
+| :--- | :--- | :--- | :--- |
+| `motion` | `esp32_sim_01`, ... | `motion` | `state` (Idle, Continuous_Vibration, Tilted_Abnormal), `confidence` |
+| `climate` | `climate_01`, ... | `climate` | `temperature` (C), `humidity` (%) |
+| `water` | `water_01`, ... | `water_quality` | `ph`, `temperature` (C), `status` (OK, Too_Acidic, Too_Alkaline) |
+
+Readings drift gradually like a real sensor. For a quick random demo with no options to remember:
+
+```bash
+python examples/fake_device.py --rand
+```
+
+Or a mixed run with live updates until you press Ctrl+C:
+
+```bash
+python examples/fake_device.py --type all --devices 6 --count 0 --interval 1
+```
+
 | Option | Default | Meaning |
 | :--- | :--- | :--- |
 | `--url` | `http://localhost:8000/events` | Where to send events |
+| `--rand` | off | Pick random settings for anything you don't give (types, devices, count, interval). Prints what it chose and a `--seed` to repeat the run |
 | `--devices` | `1` | Number of simulated devices |
+| `--type` | `motion` | Sensor type: `motion`, `climate`, `water`, `all`, or a comma list such as `climate,water`. With several types, devices take turns |
 | `--count` | `10` | Rounds to send (`0` = run until Ctrl+C) |
 | `--interval` | `1.0` | Seconds between rounds |
 | `--invalid-rate` | `0` | Fraction of events deliberately broken (`0` to `1`), to see validation at work |
