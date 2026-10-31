@@ -105,3 +105,35 @@ def get_recent_events(limit: int = 50, device_id: str | None = None) -> list[dic
         rows = conn.execute(query, params).fetchall()
 
     return [_row_to_dict(row) for row in rows]
+
+
+def max_sequence(device_id: str) -> int:
+    """The highest sequence number stored for a device, or 0 if it has none."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT MAX(sequence) FROM events WHERE device_id = ?", (device_id,)
+        ).fetchone()
+    return row[0] or 0
+
+
+def prune_events(keep: int, device_ids: list[str]) -> int:
+    """Keep only the newest `keep` events of the given devices. Returns how many were deleted.
+
+    Events from any other device are never touched.
+    """
+    if not device_ids:
+        return 0
+    marks = ",".join("?" * len(device_ids))
+    with get_conn() as conn:
+        cur = conn.execute(
+            f"""
+            DELETE FROM events
+            WHERE device_id IN ({marks})
+              AND id NOT IN (
+                  SELECT id FROM events WHERE device_id IN ({marks})
+                  ORDER BY id DESC LIMIT ?
+              )
+            """,
+            [*device_ids, *device_ids, keep],
+        )
+        return cur.rowcount
