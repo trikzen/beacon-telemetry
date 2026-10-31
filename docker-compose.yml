@@ -7,7 +7,10 @@ services:
     volumes:
       - beacon-data:/data      # keeps the SQLite database between restarts
     environment:
-      BEACON_DEMO: ${BEACON_DEMO:-0}    # set to 1 for demo mode (see README)
+      BEACON_DEMO: ${BEACON_DEMO:-0}                  # 1 = demo mode (see README)
+      BEACON_REQUIRE_KEY: ${BEACON_REQUIRE_KEY:-0}    # 1 = events need an API key
+      BEACON_RATE_LIMIT: ${BEACON_RATE_LIMIT:-300}    # events per minute per key, 0 = no limit
+      BEACON_ADMIN_TOKEN: ${BEACON_ADMIN_TOKEN:-}     # long secret that turns on the /admin API
     restart: unless-stopped
 
 volumes:
