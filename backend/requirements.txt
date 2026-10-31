@@ -1,0 +1,4 @@
+# Runtime dependencies for the backend (pinned to the versions this was tested with).
+# Install with:  pip install -r backend/requirements.txt
+fastapi==0.162.0
+uvicorn[standard]==0.54.0   # "standard" includes the WebSocket support
