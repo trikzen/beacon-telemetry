@@ -6,6 +6,8 @@ services:
       - "8000:8000"
     volumes:
       - beacon-data:/data      # keeps the SQLite database between restarts
+    environment:
+      BEACON_DEMO: ${BEACON_DEMO:-0}    # set to 1 for demo mode (see README)
     restart: unless-stopped
 
 volumes:

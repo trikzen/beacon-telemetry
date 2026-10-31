@@ -30,6 +30,7 @@
   const feedMetaEl = $("feedMeta");
   const rowsEl = $("rows");
   const emptyFeedEl = $("emptyFeed");
+  const demoBannerEl = $("demoBanner");
 
   const hasChart = typeof Chart !== "undefined";
 
@@ -462,6 +463,16 @@
     statusEl.classList.toggle("live", live);
   }
 
+  // Ask the server whether it is running in demo mode, and say so on the page.
+  async function checkDemo() {
+    try {
+      const response = await fetch("/health");
+      if (!response.ok) return;
+      const info = await response.json();
+      demoBannerEl.hidden = info.demo !== true;
+    } catch (err) { /* no banner if the server cannot be reached */ }
+  }
+
   async function loadHistory() {
     try {
       const response = await fetch("/events?limit=" + HISTORY_LIMIT);
@@ -512,6 +523,7 @@
     chartsEmptyEl.hidden = true;
   }
   setTheme(currentTheme(), false);   // sync the button label with the theme already applied
+  checkDemo();
   loadHistory();
   connect();
   setInterval(renderDevices, 1000);  // keeps the "last seen" text fresh

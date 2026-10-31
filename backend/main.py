@@ -1,5 +1,6 @@
+import asyncio
 import os
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
@@ -7,7 +8,8 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from db import get_event, get_recent_events, init_db, save_event
+from db import get_event, get_recent_events, init_db, max_sequence, prune_events, save_event
+from demo import demo_enabled, run_demo
 from models import Event
 from ws_manager import ConnectionManager
 
@@ -15,12 +17,20 @@ BASE_DIR = Path(__file__).resolve().parent
 # The dashboard sits next to this folder. Set BEACON_DASHBOARD_DIR to use another location.
 DASHBOARD_DIR = Path(os.environ.get("BEACON_DASHBOARD_DIR", BASE_DIR.parent / "dashboard"))
 manager = ConnectionManager()
+DEMO = demo_enabled()   # BEACON_DEMO=1 makes the server generate its own demo devices
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()  # create the table on startup if it's missing
+    demo_task = None
+    if DEMO:
+        demo_task = asyncio.create_task(run_demo(handle_event, max_sequence, prune_events))
     yield
+    if demo_task:
+        demo_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await demo_task
 
 
 app = FastAPI(title="beacon-telemetry", lifespan=lifespan)
@@ -51,7 +61,7 @@ def dashboard():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "message": "telemetry server running"}
+    return {"status": "ok", "message": "telemetry server running", "demo": DEMO}
 
 
 @app.post("/events")
