@@ -8,6 +8,8 @@
   const MAX_POINTS = 100;       // points per line on a chart
   const MAX_CATEGORIES = 8;     // text fields with more distinct values get no chart
   const MIN_WINDOW_MS = 10000;  // shortest time span a line chart will show
+  const MIN_GAP_MS = 30000;     // a pause longer than this (and 5x the usual interval) starts a new run
+  const GAP_FACTOR = 5;
   const RECONNECT_MS = 2000;
   const PALETTE = [
     "#3b82f6", "#f59e0b", "#10b981", "#ef4444",
@@ -18,6 +20,7 @@
   const $ = (id) => document.getElementById(id);
   const statusEl = $("status");
   const themeToggle = $("themeToggle");
+  const clearBtn = $("clearBtn");
   const filterEl = $("deviceFilter");
   const deviceListEl = $("deviceList");
   const noDevicesEl = $("noDevices");
@@ -38,6 +41,7 @@
   const deviceUI = new Map();         // device id -> its elements in the sidebar
   const chartUI = new Map();          // chart key -> { chart, card, kind }
   let deviceIdsKey = "";
+  let clearedUpToId = 0;              // events with an id at or below this were cleared from view
 
   function colorFor(deviceId) {
     if (!deviceColors.has(deviceId)) {
@@ -50,7 +54,7 @@
   function ingest(list) {
     let outOfOrder = false;
     for (const e of list) {
-      if (!e || typeof e.id !== "number" || eventsById.has(e.id)) continue;  // skip duplicates
+      if (!e || typeof e.id !== "number" || e.id <= clearedUpToId || eventsById.has(e.id)) continue;  // skip duplicates and cleared events
       eventsById.set(e.id, e);
       if (events.length && events[events.length - 1].id > e.id) outOfOrder = true;
       events.push(e);
@@ -207,9 +211,30 @@
   // Charts: the type of chart is chosen from the type of each field in the data.
   //   number field          -> line chart (one line per device)
   //   text field, few values -> bar chart of counts (for example "state")
+  //
+  // A chart shows only the current "run": if there was a long pause in its data, everything
+  // before the pause is left out, so new data starts a fresh chart instead of being joined
+  // to old data by a long line. Older events are still in the live feed.
+  function runStart(times) {
+    const xs = [...new Set(times)].sort((a, b) => a - b);
+    if (xs.length < 2) return xs.length ? xs[0] : 0;
+    const steps = [];
+    for (let i = 1; i < xs.length; i++) steps.push(xs[i] - xs[i - 1]);
+    const sorted = [...steps].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    const gap = Math.max(MIN_GAP_MS, GAP_FACTOR * median);
+    for (let i = steps.length - 1; i >= 0; i--) {
+      if (steps[i] > gap) return xs[i + 1];   // the newest pause: the run starts right after it
+    }
+    return xs[0];
+  }
+
   function collectSpecs(list) {
     const specs = new Map();
     for (const e of list) {
+      let x = Date.parse(e.timestamp);
+      if (Number.isNaN(x)) x = seenMs(e);
+      if (Number.isNaN(x)) continue;
       for (const [field, value] of Object.entries(e.data || {})) {
         let kind = null;
         if (typeof value === "number" && Number.isFinite(value)) kind = "line";
@@ -223,26 +248,30 @@
             key,
             kind,
             title: e.event_type + " · " + field,
+            entries: [],
             devices: new Map(),
             counts: new Map(),
+            hidden: 0,
           };
           specs.set(key, spec);
         }
-
-        if (kind === "line") {
-          const x = Date.parse(e.timestamp);
-          if (Number.isNaN(x)) continue;
-          if (!spec.devices.has(e.device_id)) spec.devices.set(e.device_id, []);
-          spec.devices.get(e.device_id).push({ x, y: value });
-        } else {
-          const label = String(value);
-          spec.counts.set(label, (spec.counts.get(label) || 0) + 1);
-        }
+        spec.entries.push({ x, device: e.device_id, value });
       }
     }
 
     const result = [];
     for (const spec of specs.values()) {
+      const start = runStart(spec.entries.map((en) => en.x));
+      for (const en of spec.entries) {
+        if (en.x < start) { spec.hidden += 1; continue; }
+        if (spec.kind === "line") {
+          if (!spec.devices.has(en.device)) spec.devices.set(en.device, []);
+          spec.devices.get(en.device).push({ x: en.x, y: en.value });
+        } else {
+          const label = String(en.value);
+          spec.counts.set(label, (spec.counts.get(label) || 0) + 1);
+        }
+      }
       if (spec.kind === "bar" && spec.counts.size > MAX_CATEGORIES) continue;
       for (const [id, points] of spec.devices) {
         points.sort((a, b) => a.x - b.x);              // draw each line left to right
@@ -303,7 +332,10 @@
     box.className = "chart-box";
     const canvas = document.createElement("canvas");
     box.appendChild(canvas);
-    card.append(title, box);
+    const note = document.createElement("p");
+    note.className = "chart-note";
+    note.hidden = true;
+    card.append(title, box, note);
     chartsEl.appendChild(card);
 
     const chart = new Chart(canvas, {
@@ -312,13 +344,19 @@
       options: chartOptions(spec.kind),
     });
     applyChartTheme(chart);
-    const ui = { chart, card, kind: spec.kind };
+    const ui = { chart, card, note, kind: spec.kind };
     chartUI.set(spec.key, ui);
     return ui;
   }
 
   function updateChart(ui, spec) {
     const chart = ui.chart;
+    ui.note.hidden = spec.hidden === 0;
+    if (spec.hidden) {
+      ui.note.textContent = "Showing the latest run. " + spec.hidden +
+        (spec.hidden === 1 ? " earlier reading is" : " earlier readings are") +
+        " hidden after a pause in the data (still in the live feed).";
+    }
     if (spec.kind === "line") {
       const datasets = [...spec.devices].map(([id, points]) => ({
         label: id,
@@ -370,6 +408,20 @@
       updateChart(chartUI.get(spec.key) || createChart(spec), spec);
     }
   }
+
+  // ---- clear ----
+  // Clears the feed, charts and device list on this page only. Nothing is deleted from the
+  // database, and reloading the page brings the recent history back.
+  function clearView() {
+    if (events.length) clearedUpToId = Math.max(clearedUpToId, events[events.length - 1].id);
+    events = [];
+    eventsById.clear();
+    selectedDevice = "all";
+    filterEl.value = "all";
+    render();
+  }
+
+  clearBtn.addEventListener("click", clearView);
 
   // ---- dark mode ----
   function currentTheme() {
