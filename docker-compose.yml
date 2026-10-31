@@ -1,0 +1,12 @@
+# Start everything with:  docker compose up --build
+services:
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - beacon-data:/data      # keeps the SQLite database between restarts
+    restart: unless-stopped
+
+volumes:
+  beacon-data:
