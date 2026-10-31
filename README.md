@@ -27,7 +27,7 @@ Real-time IoT telemetry platform: a FastAPI + SQLite backend, a WebSocket live f
 Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine with Compose).
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/beacon-telemetry.git
+git clone https://github.com/trikzen/beacon-telemetry.git
 cd beacon-telemetry
 docker compose up --build
 ```
