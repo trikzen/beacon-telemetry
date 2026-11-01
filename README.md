@@ -1,9 +1,9 @@
 # beacon-telemetry
+Real-time IoT telemetry platform: a FastAPI + SQLite backend, a WebSocket live feed, and a Chart.js dashboard. Any device that can send JSON over HTTP can feed it.
+
 **Live demo: [https://beacon-telemetry.onrender.com](https://beacon-telemetry.onrender.com)**
 
 > The data on the demo is simulated by the server (devices named `demo_*`). The demo runs on a free host, so if it has been idle, the first load can take up to a minute to wake up.
-
-Real-time IoT telemetry platform: a FastAPI + SQLite backend, a WebSocket live feed, and a Chart.js dashboard. Any device that can send JSON over HTTP can feed it.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/dashboard-dark.png">
