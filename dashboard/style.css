@@ -179,3 +179,20 @@ td.data {
   color: var(--text);
   font-size: 0.9rem;
 }
+
+/* Link styled like the other topbar buttons, with an icon */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+}
+.btn-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;   /* follows the theme's text colour in light and dark mode */
+}
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
