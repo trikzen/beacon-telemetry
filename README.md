@@ -307,7 +307,10 @@ beacon-telemetry/
 │   ├── manage_keys.py     Command-line tool: create, list and revoke keys
 │   ├── settings.py        Reads settings from environment variables
 │   └── requirements.txt
-├── dashboard/             index.html, style.css, app.js (plain JavaScript + Chart.js)
+├── dashboard/           
+│   ├── index.html         page layout: header, device list, charts and live feed
+│   ├── style.css          styling, plus the light and dark themes
+│   └── app.js             live WebSockets feed, charts and device filter
 ├── examples/
 │   └── fake_device.py     Simulated devices for testing without hardware
 ├── docs/                  Screenshots
@@ -345,6 +348,7 @@ Planned, not built yet:
 - A device registry (names, locations, firmware versions) and user accounts
 - Reliable delivery from devices (buffering while offline, sequence-based de-duplication)
 - Automated tests and CI
+- CSV exporter fetaure on dashboard
 
 ## Privacy
 
